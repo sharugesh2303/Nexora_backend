@@ -1,0 +1,17 @@
+# Dependencies
+/node_modules
+
+# Environment/Secrets
+.env
+.env.*
+.env.local
+
+# Logs
+*.log
+
+# Build artifacts
+/client-app/build
+/admin-app/build
+
+# Submodule configuration (Remove this if you fix submodules, otherwise keep it to ignore potential misconfigs)
+.gitmodules
