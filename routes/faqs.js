@@ -5,9 +5,7 @@ import requireAuth from '../middleware/auth.js';
 
 const router = express.Router();
 
-/**
- * Public: GET /api/content/faqs
- */
+// GET /api/content/faqs  (public)
 router.get('/', async (req, res) => {
   try {
     const faqs = await Faq.find().sort({ order: -1, createdAt: -1 }).lean();
@@ -18,9 +16,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-/**
- * GET single
- */
+// GET /api/content/faqs/:id
 router.get('/:id', async (req, res) => {
   try {
     const faq = await Faq.findById(req.params.id).lean();
@@ -32,9 +28,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-/**
- * Protected: create
- */
+// POST (protected)
 router.post('/', requireAuth, async (req, res) => {
   try {
     const { question, answer, order } = req.body;
@@ -47,9 +41,7 @@ router.post('/', requireAuth, async (req, res) => {
   }
 });
 
-/**
- * Protected: update
- */
+// PUT (protected)
 router.put('/:id', requireAuth, async (req, res) => {
   try {
     const { question, answer, order } = req.body;
@@ -66,9 +58,7 @@ router.put('/:id', requireAuth, async (req, res) => {
   }
 });
 
-/**
- * Protected: delete
- */
+// DELETE (protected)
 router.delete('/:id', requireAuth, async (req, res) => {
   try {
     const removed = await Faq.findByIdAndDelete(req.params.id);
