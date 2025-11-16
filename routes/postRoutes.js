@@ -1,3 +1,4 @@
+// routes/postRoutes.js (No change needed)
 import express from 'express';
 import auth from '../middleware/auth.js'; 
 import Post from '../models/Post.js'; 

@@ -1,3 +1,4 @@
+// models/Post.js
 import mongoose from 'mongoose';
 
 const PostSchema = new mongoose.Schema({
@@ -13,7 +14,7 @@ const PostSchema = new mongoose.Schema({
         type: String,
         required: true
     },
-    // UPDATED FIELD: Replaces headerImage with an array of strings
+    // ✅ UPDATED FIELD: Replaces headerImage with an array of strings
     images: {
         type: [String], // Array of strings (URLs)
         default: []
