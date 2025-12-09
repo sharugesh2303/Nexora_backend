@@ -1,4 +1,4 @@
-// server.js (Unified with ESM imports, Security, CORS, Milestones, and Stories)
+// server.js
 
 import express from "express";
 import mongoose from "mongoose";
@@ -7,13 +7,10 @@ import dotenv from "dotenv";
 import helmet from "helmet";
 import morgan from "morgan";
 
-// Load environment variables
+// Load env variables
 dotenv.config();
 
-// =======================
-// IMPORT ROUTES 
-// (CRUCIAL: Ensure filenames match exactly in your routes directory)
-// =======================
+// ===== ROUTES (ESM imports) =====
 import authRoutes from "./routes/authRoutes.js";
 import contentRoutes from "./routes/contentRoutes.js";
 import messageRoutes from "./routes/messageRoutes.js";
@@ -21,7 +18,7 @@ import postRoutes from "./routes/postRoutes.js";
 import projectRoutes from "./routes/projectRoutes.js";
 import tagRoutes from "./routes/tagRoutes.js";
 import milestoneRoutes from "./routes/milestones.js";
-import storyRoutes from "./routes/storyRoutes.js"; // Story Route Import
+import storyRoutes from "./routes/storyRoutes.js"; // <-- STORIES
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -35,35 +32,33 @@ app.set("trust proxy", 1);
 // =======================
 (async () => {
   try {
-    if (!process.env.MONGO_URI) {
-      const fallbackUri = "mongodb://127.0.0.1:27017/nexora";
-      console.warn(`⚠️ MONGO_URI not found in .env. Using fallback: ${fallbackUri}`);
+    const uri = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/nexora";
 
-      if (process.env.NODE_ENV === "production") {
-        console.error("No MONGO_URI set in environment. Aborting.");
-        process.exit(1);
-      }
-      await mongoose.connect(fallbackUri);
-    } else {
-      await mongoose.connect(process.env.MONGO_URI);
+    if (!process.env.MONGO_URI) {
+      console.warn(
+        `⚠️ MONGO_URI not found in .env. Using fallback local URI: ${uri}`
+      );
     }
 
+    await mongoose.connect(uri);
     console.log("✅ MongoDB Connected Successfully");
   } catch (err) {
     console.error("❌ MongoDB Connection Failed:", err?.message || err);
-    console.log("Make sure MONGO_URI is set in your .env or hosting secrets.");
+    console.error(
+      "Make sure MONGO_URI is set correctly in your environment / hosting."
+    );
     process.exit(1);
   }
 })();
 
 // =======================
-//  MIDDLEWARE: SECURITY & LOGGING
+//  SECURITY & LOGGING
 // =======================
 app.use(helmet());
 app.use(morgan("dev"));
 
 // =======================
-//  CORS CONFIGURATION
+//  CORS
 // =======================
 const allowedOrigins = [
   "http://localhost:3000",
@@ -71,19 +66,21 @@ const allowedOrigins = [
   "https://nexoracrew.com",
   "https://www.nexoracrew.com",
   "https://nexora-frontend-kappa.vercel.app",
-  process.env.ADMIN_ORIGIN, // optional
+  process.env.ADMIN_ORIGIN,
 ].filter(Boolean);
 
 const corsOptions = {
   origin: (origin, callback) => {
-    // allow requests with no origin (server-to-server, curl, Postman)
-    if (!origin) return callback(null, true);
+    if (!origin) return callback(null, true); // Postman, curl, server-to-server
+
     try {
       const isAllowed =
         allowedOrigins.includes(origin) ||
         String(origin).endsWith(".vercel.app") ||
         String(origin).endsWith(".koyeb.app");
+
       if (isAllowed) return callback(null, true);
+
       console.warn(`🚫 Blocked by CORS: ${origin}`);
       return callback(new Error(`Not allowed by CORS: ${origin}`), false);
     } catch (err) {
@@ -94,7 +91,7 @@ const corsOptions = {
   credentials: true,
 };
 
-// 1. Add Private Network Access (PNA) header logic
+// PNA header helper
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   try {
@@ -103,16 +100,13 @@ app.use((req, res, next) => {
       allowedOrigins.includes(origin) ||
       String(origin).endsWith(".vercel.app") ||
       String(origin).endsWith(".koyeb.app");
-    if (isAllowed) {
-      res.setHeader("Access-Control-Allow-Private-Network", "true");
-    }
-  } catch (e) {
+    if (isAllowed) res.setHeader("Access-Control-Allow-Private-Network", "true");
+  } catch {
     /* ignore */
   }
   next();
 });
 
-// 2. Apply general CORS for all actual requests (including preflight options)
 app.use(cors(corsOptions));
 
 // =======================
@@ -122,7 +116,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // =======================
-//  API ROUTES (mount)
+//  API ROUTES
 // =======================
 app.use("/api/auth", authRoutes);
 app.use("/api/content", contentRoutes);
@@ -131,13 +125,12 @@ app.use("/api/posts", postRoutes);
 app.use("/api/projects", projectRoutes);
 app.use("/api/tags", tagRoutes);
 app.use("/api/milestones", milestoneRoutes);
-
-// STORIES – main path and backwards-compatible alias
-app.use("/api/stories", storyRoutes);        // main path
-app.use("/api/client-stories", storyRoutes); // alias used by old frontend code
+app.use("/api/stories", storyRoutes); // <-- IMPORTANT
+// (optional alias if you ever used /api/client-stories before)
+// app.use("/api/client-stories", storyRoutes);
 
 // =======================
-//  HEALTH & ROOT ROUTES
+//  HEALTH & ROOT
 // =======================
 app.get("/", (_req, res) => {
   res.status(200).json({
@@ -154,30 +147,30 @@ app.get("/health", (_req, res) => {
   });
 });
 
-// optional route-inspector for non-production
-if (process.env.NODE_ENV !== "production") {
-  app.get("/__routes", (_req, res) => {
-    const routes = [];
-    app._router.stack.forEach((middleware) => {
-      if (middleware.route) {
-        const method = Object.keys(middleware.route.methods)[0].toUpperCase();
-        routes.push(`${method} ${middleware.route.path}`);
-      } else if (middleware.name === "router") {
-        middleware.handle.stack.forEach((handler) => {
-          const route = handler.route;
-          if (route) {
-            const method = Object.keys(route.methods)[0].toUpperCase();
-            routes.push(`${method} ${route.path}`);
-          }
-        });
-      }
-    });
-    res.json({ routes });
+// Simple route inspector (enabled ALWAYS to debug /api/stories)
+app.get("/__routes", (_req, res) => {
+  const routes = [];
+
+  app._router.stack.forEach((middleware) => {
+    if (middleware.route) {
+      const method = Object.keys(middleware.route.methods)[0].toUpperCase();
+      routes.push(`${method} ${middleware.route.path}`);
+    } else if (middleware.name === "router" && middleware.handle.stack) {
+      middleware.handle.stack.forEach((handler) => {
+        const route = handler.route;
+        if (route) {
+          const method = Object.keys(route.methods)[0].toUpperCase();
+          routes.push(`${method} ${route.path}`);
+        }
+      });
+    }
   });
-}
+
+  res.json({ routes });
+});
 
 // =======================
-//  404 CATCH-ALL ROUTE 🚨
+//  404 CATCH-ALL
 // =======================
 app.use((req, res) => {
   res.status(404).json({
@@ -186,14 +179,11 @@ app.use((req, res) => {
 });
 
 // =======================
-//  ERROR HANDLING
+//  ERROR HANDLER
 // =======================
 /* eslint-disable no-unused-vars */
 app.use((err, _req, res, _next) => {
-  console.error(
-    "⚠️ Error Handler:",
-    err && err.message ? err.message : err
-  );
+  console.error("⚠️ Error Handler:", err?.message || err);
   if (String(err?.message || "").startsWith("Not allowed by CORS")) {
     return res.status(403).json({ message: err.message });
   }
@@ -202,21 +192,15 @@ app.use((err, _req, res, _next) => {
 /* eslint-enable no-unused-vars */
 
 // =======================
-//  GLOBAL ERROR & EXIT HANDLERS
+//  GLOBAL ERROR & EXIT
 // =======================
 process.on("unhandledRejection", (err) => {
-  console.error(
-    "💥 Unhandled Rejection:",
-    err && err.message ? err.message : err
-  );
+  console.error("💥 Unhandled Rejection:", err?.message || err);
   if (process.env.NODE_ENV === "production") process.exit(1);
 });
 
 process.on("uncaughtException", (err) => {
-  console.error(
-    "💣 Uncaught Exception:",
-    err && err.stack ? err.stack : err
-  );
+  console.error("💣 Uncaught Exception:", err?.stack || err);
   if (process.env.NODE_ENV === "production") process.exit(1);
 });
 
