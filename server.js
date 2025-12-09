@@ -1,5 +1,3 @@
-// server.js
-
 import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
@@ -18,7 +16,8 @@ import postRoutes from "./routes/postRoutes.js";
 import projectRoutes from "./routes/projectRoutes.js";
 import tagRoutes from "./routes/tagRoutes.js";
 import milestoneRoutes from "./routes/milestones.js";
-import storyRoutes from "./routes/storyRoutes.js"; // <-- STORIES
+import storyRoutes from "./routes/storyRoutes.js";
+import partnerRoutes from "./routes/partnerRoutes.js"; // <--- IMPORT THIS
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -45,9 +44,6 @@ app.set("trust proxy", 1);
     console.log("✅ MongoDB Connected Successfully");
   } catch (err) {
     console.error("❌ MongoDB Connection Failed:", err?.message || err);
-    console.error(
-      "Make sure MONGO_URI is set correctly in your environment / hosting."
-    );
     process.exit(1);
   }
 })();
@@ -95,25 +91,6 @@ const corsOptions = {
   credentials: true,
 };
 
-// PNA header helper
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  try {
-    const isAllowed =
-      !origin ||
-      allowedOrigins.includes(origin) ||
-      String(origin).endsWith(".vercel.app") ||
-      String(origin).endsWith(".koyeb.app");
-
-    if (isAllowed) {
-      res.setHeader("Access-Control-Allow-Private-Network", "true");
-    }
-  } catch {
-    // ignore
-  }
-  next();
-});
-
 app.use(cors(corsOptions));
 
 // =======================
@@ -132,10 +109,8 @@ app.use("/api/posts", postRoutes);
 app.use("/api/projects", projectRoutes);
 app.use("/api/tags", tagRoutes);
 app.use("/api/milestones", milestoneRoutes);
-app.use("/api/stories", storyRoutes); // <-- IMPORTANT
-
-// (optional alias if you ever used /api/client-stories before)
-// app.use("/api/client-stories", storyRoutes);
+app.use("/api/stories", storyRoutes);
+app.use("/api/partners", partnerRoutes); // <--- REGISTER ROUTE HERE
 
 // =======================
 //  HEALTH & ROOT
@@ -143,7 +118,6 @@ app.use("/api/stories", storyRoutes); // <-- IMPORTANT
 app.get("/", (_req, res) => {
   res.status(200).json({
     message: "🚀 Welcome to the NEXORA API. The server is alive and running!",
-    environment: process.env.NODE_ENV || "development",
   });
 });
 
@@ -153,28 +127,6 @@ app.get("/health", (_req, res) => {
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
   });
-});
-
-// Simple route inspector (handy to confirm /api/stories is mounted)
-app.get("/__routes", (_req, res) => {
-  const routes = [];
-
-  app._router.stack.forEach((middleware) => {
-    if (middleware.route) {
-      const method = Object.keys(middleware.route.methods)[0].toUpperCase();
-      routes.push(`${method} ${middleware.route.path}`);
-    } else if (middleware.name === "router" && middleware.handle.stack) {
-      middleware.handle.stack.forEach((handler) => {
-        const route = handler.route;
-        if (route) {
-          const method = Object.keys(route.methods)[0].toUpperCase();
-          routes.push(`${method} ${route.path}`);
-        }
-      });
-    }
-  });
-
-  res.json({ routes });
 });
 
 // =======================
@@ -189,27 +141,12 @@ app.use((req, res) => {
 // =======================
 //  ERROR HANDLER
 // =======================
-/* eslint-disable no-unused-vars */
 app.use((err, _req, res, _next) => {
   console.error("⚠️ Error Handler:", err?.message || err);
   if (String(err?.message || "").startsWith("Not allowed by CORS")) {
     return res.status(403).json({ message: err.message });
   }
   res.status(500).json({ message: err?.message || "Internal server error" });
-});
-/* eslint-enable no-unused-vars */
-
-// =======================
-//  GLOBAL ERROR & EXIT
-// =======================
-process.on("unhandledRejection", (err) => {
-  console.error("💥 Unhandled Rejection:", err?.message || err);
-  if (process.env.NODE_ENV === "production") process.exit(1);
-});
-
-process.on("uncaughtException", (err) => {
-  console.error("💣 Uncaught Exception:", err?.stack || err);
-  if (process.env.NODE_ENV === "production") process.exit(1);
 });
 
 // =======================
