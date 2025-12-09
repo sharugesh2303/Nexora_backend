@@ -1,51 +1,41 @@
 // routes/storyRoutes.js
 import express from "express";
 import Story from "../models/Story.js";
-import auth from "../middleware/auth.js"; // middleware can stay CommonJS, ES import will still work
+import auth from "../middleware/auth.js"; // Admin token middleware
 
 const router = express.Router();
 
-/**
- * @route   GET /api/stories
- * @desc    Get all stories (public - used by HomePage / clients)
- */
+// @route   GET /api/stories
+// @desc    Get all stories (Public)
 router.get("/", async (_req, res) => {
   try {
     const stories = await Story.find().sort({ date: -1 });
-    res.json(stories);
+    return res.json(stories);
   } catch (err) {
     console.error("GET /api/stories error:", err.message || err);
-    res.status(500).send("Server Error");
+    return res.status(500).send("Server Error");
   }
 });
 
-/**
- * @route   POST /api/stories
- * @desc    Add a new story (private - admin only)
- */
+// @route   POST /api/stories
+// @desc    Add a new story (Admin)
 router.post("/", auth, async (req, res) => {
   const { quote, author, role } = req.body;
 
-  if (!quote || !author || !role) {
-    return res.status(400).json({ msg: "quote, author and role are required" });
-  }
-
   try {
-    const story = await Story.create({ quote, author, role });
-    res.json(story);
+    const newStory = new Story({ quote, author, role });
+    const story = await newStory.save();
+    return res.json(story);
   } catch (err) {
     console.error("POST /api/stories error:", err.message || err);
-    res.status(500).send("Server Error");
+    return res.status(500).send("Server Error");
   }
 });
 
-/**
- * @route   PUT /api/stories/:id
- * @desc    Update a story (private - admin only)
- */
+// @route   PUT /api/stories/:id
+// @desc    Update a story (Admin)
 router.put("/:id", auth, async (req, res) => {
   const { quote, author, role } = req.body;
-
   const storyFields = {};
   if (quote !== undefined) storyFields.quote = quote;
   if (author !== undefined) storyFields.author = author;
@@ -53,7 +43,9 @@ router.put("/:id", auth, async (req, res) => {
 
   try {
     let story = await Story.findById(req.params.id);
-    if (!story) return res.status(404).json({ msg: "Story not found" });
+    if (!story) {
+      return res.status(404).json({ msg: "Story not found" });
+    }
 
     story = await Story.findByIdAndUpdate(
       req.params.id,
@@ -61,17 +53,15 @@ router.put("/:id", auth, async (req, res) => {
       { new: true }
     );
 
-    res.json(story);
+    return res.json(story);
   } catch (err) {
     console.error("PUT /api/stories/:id error:", err.message || err);
-    res.status(500).send("Server Error");
+    return res.status(500).send("Server Error");
   }
 });
 
-/**
- * @route   DELETE /api/stories/:id
- * @desc    Delete a story (private - admin only)
- */
+// @route   DELETE /api/stories/:id
+// @desc    Delete a story (Admin)
 router.delete("/:id", auth, async (req, res) => {
   try {
     const story = await Story.findById(req.params.id);
@@ -80,10 +70,10 @@ router.delete("/:id", auth, async (req, res) => {
     }
 
     await Story.findByIdAndDelete(req.params.id);
-    res.json({ msg: "Story removed" });
+    return res.json({ msg: "Story removed" });
   } catch (err) {
     console.error("DELETE /api/stories/:id error:", err.message || err);
-    res.status(500).send("Server Error");
+    return res.status(500).send("Server Error");
   }
 });
 

@@ -25,6 +25,7 @@ const PORT = process.env.PORT || 5000;
 const HOST = "0.0.0.0";
 
 console.log("Starting server from:", process.cwd());
+console.log("NODE_ENV:", process.env.NODE_ENV || "development");
 app.set("trust proxy", 1);
 
 // =======================
@@ -69,9 +70,12 @@ const allowedOrigins = [
   process.env.ADMIN_ORIGIN,
 ].filter(Boolean);
 
+console.log("Allowed CORS origins:", allowedOrigins);
+
 const corsOptions = {
   origin: (origin, callback) => {
-    if (!origin) return callback(null, true); // Postman, curl, server-to-server
+    // allow requests with no origin (server-to-server, Postman, curl)
+    if (!origin) return callback(null, true);
 
     try {
       const isAllowed =
@@ -100,9 +104,12 @@ app.use((req, res, next) => {
       allowedOrigins.includes(origin) ||
       String(origin).endsWith(".vercel.app") ||
       String(origin).endsWith(".koyeb.app");
-    if (isAllowed) res.setHeader("Access-Control-Allow-Private-Network", "true");
+
+    if (isAllowed) {
+      res.setHeader("Access-Control-Allow-Private-Network", "true");
+    }
   } catch {
-    /* ignore */
+    // ignore
   }
   next();
 });
@@ -126,6 +133,7 @@ app.use("/api/projects", projectRoutes);
 app.use("/api/tags", tagRoutes);
 app.use("/api/milestones", milestoneRoutes);
 app.use("/api/stories", storyRoutes); // <-- IMPORTANT
+
 // (optional alias if you ever used /api/client-stories before)
 // app.use("/api/client-stories", storyRoutes);
 
@@ -147,7 +155,7 @@ app.get("/health", (_req, res) => {
   });
 });
 
-// Simple route inspector (enabled ALWAYS to debug /api/stories)
+// Simple route inspector (handy to confirm /api/stories is mounted)
 app.get("/__routes", (_req, res) => {
   const routes = [];
 
