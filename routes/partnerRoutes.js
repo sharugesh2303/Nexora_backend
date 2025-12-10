@@ -69,7 +69,7 @@ router.put('/:id', auth, async (req, res) => {
 router.delete('/:id', auth, async (req, res) => {
   try {
     const partner = await Partner.findById(req.params.id);
-    if (!partner) return res.status(404).json({ msg: 'Partner not found' });
+    if (!partner) return res.status(404).json({ msg: 'Partner notfound' });
 
     await partner.deleteOne();
     res.json({ msg: 'Partner removed' });

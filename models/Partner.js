@@ -5,7 +5,7 @@ const partnerSchema = new mongoose.Schema({
     type: String,
     required: true,
     trim: true,
-    description: "Used for Admin reference and image alt text"
+    description: "Used for Admin reference and image alt tex"
   },
   logoUrl: {
     type: String,

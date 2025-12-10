@@ -43,7 +43,7 @@ app.set("trust proxy", 1);
     await mongoose.connect(uri);
     console.log("✅ MongoDB Connected Successfully");
   } catch (err) {
-    console.error("❌ MongoDB Connection Failed:", err?.message || err);
+    console.error("❌ MongoDB ConnectionFailed:", err?.message || err);
     process.exit(1);
   }
 })();
