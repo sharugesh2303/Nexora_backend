@@ -48,7 +48,7 @@ router.post(
 
             // 3️⃣ EMAIL CONTENT
             const mailOptions = {
-                from: `"Nexora Contact" <${process.env.GMAIL_USER}>`,
+                from: `"Nexoracrew Contact" <${process.env.GMAIL_USER}>`,
                 to: process.env.GMAIL_USER,  // sending to your own mail
                 subject: "📬 New Contact Form Message - Nexora",
                 html: `
@@ -73,7 +73,7 @@ router.post(
                 await client.messages.create({
                     from: 'whatsapp:+14155238886', // Twilio Sandbox Number
                     to: `whatsapp:${process.env.ADMIN_PHONE_NUMBER}`, // Your Verified Number
-                    body: `🔔 *New Nexora Inquiry*\n\n👤 *Name:* ${name}\n📱 *Mobile:* ${mobile}\n💬 *Msg:* ${message}`
+                    body: `🔔 *New Nexoracrew Inquiry*\n\n👤 *Name:* ${name}\n📱 *Mobile:* ${mobile}\n💬 *Msg:* ${message}`
                 });
                 console.log(`✅ WhatsApp Notification Sent to Admin`);
             } catch (whatsappError) {

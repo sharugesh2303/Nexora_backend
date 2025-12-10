@@ -67,7 +67,7 @@ router.post(
             const mailOptions = {
                 from: process.env.GMAIL_USER, 
                 to: username,
-                subject: 'NEXORA Admin Login Verification Code',
+                subject: 'NEXORACREW Admin Login Verification Code',
                 html: `<p>Your One-Time Password (OTP) for NEXORA Admin Login is: <strong>${otpCode}</strong>.
                        <br/>It is valid for ${OTP_EXPIRY_MINUTES} minutes. Do not share this code.</p>`
             };
