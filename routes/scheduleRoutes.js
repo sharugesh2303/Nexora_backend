@@ -48,9 +48,9 @@ router.post('/', async (req, res) => {
             });
 
             const mailOptions = {
-                from: `"Nexora Scheduler" <${process.env.GMAIL_USER}>`,
+                from: `"Nexoracrew Scheduler" <${process.env.GMAIL_USER}>`,
                 to: process.env.GMAIL_USER, // Send to Admin
-                subject: "📅 New Meeting Request - Nexora",
+                subject: "📅 New Meeting Request - Nexoracrew",
                 html: `
                     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
                         <h2 style="color: #333;">New Meeting Request</h2>
@@ -113,7 +113,7 @@ router.post('/', async (req, res) => {
             const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
             
             // Constructing a detailed WhatsApp message
-            const whatsappBody = `📅 *New Meeting Request - Nexora*\n\n` +
+            const whatsappBody = `📅 *New Meeting Request - Nexoracrew*\n\n` +
                 `👤 *Name:* ${name}\n` +
                 `🏢 *Company:* ${companyName}\n` +
                 `💼 *Role:* ${role || 'N/A'}\n` +
