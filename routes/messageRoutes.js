@@ -1,10 +1,14 @@
 import express from 'express';
 import { check, validationResult } from 'express-validator';
 import nodemailer from 'nodemailer';
+import twilio from 'twilio'; // 1. Import Twilio
 import auth from '../middleware/auth.js';
 import Message from '../models/Message.js';
 
 const router = express.Router();
+
+// Initialize Twilio Client
+const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
 // -------------------------------------------------------------
 //  POST /messages  (Public Contact Form Submission)
@@ -62,12 +66,24 @@ router.post(
 
             // 4️⃣ SEND THE EMAIL
             await transporter.sendMail(mailOptions);
-
             console.log(`📨 Email Sent To Admin: ${process.env.GMAIL_USER}`);
 
-            // 5️⃣ SEND SUCCESS RESPONSE
+            // 5️⃣ SEND WHATSAPP NOTIFICATION (NEW)
+            try {
+                await client.messages.create({
+                    from: 'whatsapp:+14155238886', // Twilio Sandbox Number
+                    to: `whatsapp:${process.env.ADMIN_PHONE_NUMBER}`, // Your Verified Number
+                    body: `🔔 *New Nexora Inquiry*\n\n👤 *Name:* ${name}\n📱 *Mobile:* ${mobile}\n💬 *Msg:* ${message}`
+                });
+                console.log(`✅ WhatsApp Notification Sent to Admin`);
+            } catch (whatsappError) {
+                // We log the error but don't stop the response because the message was already saved/emailed
+                console.error("⚠️ WhatsApp Failed:", whatsappError.message);
+            }
+
+            // 6️⃣ SEND SUCCESS RESPONSE
             res.status(201).json({
-                message: "Message saved & emailed successfully!",
+                message: "Message saved, emailed & notified successfully!",
                 data: savedMessage,
             });
 

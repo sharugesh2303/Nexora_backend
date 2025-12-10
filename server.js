@@ -1,12 +1,9 @@
+import 'dotenv/config'; // 👈 CRITICAL FIX: Loads .env before any other imports
 import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
-import dotenv from "dotenv";
 import helmet from "helmet";
 import morgan from "morgan";
-
-// Load env variables
-dotenv.config();
 
 // ===== ROUTES (ESM imports) =====
 import authRoutes from "./routes/authRoutes.js";
@@ -17,7 +14,7 @@ import projectRoutes from "./routes/projectRoutes.js";
 import tagRoutes from "./routes/tagRoutes.js";
 import milestoneRoutes from "./routes/milestones.js";
 import storyRoutes from "./routes/storyRoutes.js";
-import partnerRoutes from "./routes/partnerRoutes.js"; // <--- IMPORT THIS
+import partnerRoutes from "./routes/partnerRoutes.js";
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -25,6 +22,8 @@ const HOST = "0.0.0.0";
 
 console.log("Starting server from:", process.cwd());
 console.log("NODE_ENV:", process.env.NODE_ENV || "development");
+
+// Proxy trust for production (Koyeb/Vercel/Heroku)
 app.set("trust proxy", 1);
 
 // =======================
@@ -43,7 +42,7 @@ app.set("trust proxy", 1);
     await mongoose.connect(uri);
     console.log("✅ MongoDB Connected Successfully");
   } catch (err) {
-    console.error("❌ MongoDB ConnectionFailed:", err?.message || err);
+    console.error("❌ MongoDB Connection Failed:", err?.message || err);
     process.exit(1);
   }
 })();
@@ -55,7 +54,7 @@ app.use(helmet());
 app.use(morgan("dev"));
 
 // =======================
-//  CORS
+//  CORS CONFIGURATION
 // =======================
 const allowedOrigins = [
   "http://localhost:3000",
@@ -110,7 +109,7 @@ app.use("/api/projects", projectRoutes);
 app.use("/api/tags", tagRoutes);
 app.use("/api/milestones", milestoneRoutes);
 app.use("/api/stories", storyRoutes);
-app.use("/api/partners", partnerRoutes); // <--- REGISTER ROUTE HERE
+app.use("/api/partners", partnerRoutes);
 
 // =======================
 //  HEALTH & ROOT
