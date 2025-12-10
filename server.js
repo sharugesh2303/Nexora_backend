@@ -1,4 +1,4 @@
-import 'dotenv/config'; // 👈 CRITICAL FIX: Loads .env before any other imports
+import 'dotenv/config'; // 👈 CRITICAL: Must be the very first line to load .env before other imports
 import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
@@ -15,6 +15,7 @@ import tagRoutes from "./routes/tagRoutes.js";
 import milestoneRoutes from "./routes/milestones.js";
 import storyRoutes from "./routes/storyRoutes.js";
 import partnerRoutes from "./routes/partnerRoutes.js";
+import scheduleRoutes from "./routes/scheduleRoutes.js"; // 👈 ADDED: Import Schedule Route
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -110,6 +111,7 @@ app.use("/api/tags", tagRoutes);
 app.use("/api/milestones", milestoneRoutes);
 app.use("/api/stories", storyRoutes);
 app.use("/api/partners", partnerRoutes);
+app.use("/api/schedule", scheduleRoutes); // 👈 ADDED: Register Schedule Route
 
 // =======================
 //  HEALTH & ROOT
