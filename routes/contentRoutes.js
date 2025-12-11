@@ -1,3 +1,4 @@
+// routes/contentRoutes.js
 import express from 'express';
 import auth from '../middleware/auth.js'; 
 
@@ -13,28 +14,23 @@ const router = express.Router();
 const getSingletonContent = async () => {
     let content = await TextContent.findOne({ singletonKey: "site_content" });
     if (!content) {
-        // Create initial content if it doesn't exist (ensures initial data structure is valid)
         content = new TextContent({
+            singletonKey: "site_content",
             general: { email: "default@email.com", phone: "123-456-7890", location: "Default Location" },
             home: { 
                 slogan: "Innovation Meets Execution", 
-                description: "We deliver digital solutions that redefine industry standards.", 
-                whyChooseUs: [
-                    { title: "Expert Team", body: "Seasoned professionals in every domain.", icon: "faUsers" },
-                    { title: "Custom Solutions", body: "Tailored to your specific business needs.", icon: "faTools" },
-                    { title: "24/7 Support", body: "We're always here when you need us.", icon: "faHeadset" },
-                ] 
+                description: "We deliver digital solutions.", 
+                whyChooseUs: [] 
             },
-            about: { heroTitle: "Our Story", heroDescription: "...", mission: "...", vision: "...", journey: "..." }
+            about: { heroTitle: "Our Story", heroDescription: "...", mission: "...", vision: "...", journey: "..." },
+            fixedRoles: [] // ✅ Ensure this exists on creation
         });
         await content.save();
     }
     return content;
 };
 
-
-// --- PUBLIC ROUTE (for client-app) ---
-// GET api/content/all
+// --- PUBLIC ROUTE ---
 router.get('/all', async (req, res) => {
     try {
         const text = await getSingletonContent();
@@ -47,10 +43,11 @@ router.get('/all', async (req, res) => {
             general: text.general,
             home: text.home,
             about: text.about,
-            services: services,
-            team: team,
-            posts: posts,
-            projects: projects
+            fixedRoles: text.fixedRoles || [], // ✅ Send roles to frontend
+            services,
+            team,
+            posts,
+            projects
         });
     } catch (err) {
         console.error("Public Content Route Failed:", err.message);
@@ -59,7 +56,6 @@ router.get('/all', async (req, res) => {
 });
 
 // --- ADMIN ROUTE ---
-// GET api/content/all-editable 
 router.get('/all-editable', auth, async (req, res) => {
     try {
         const text = await getSingletonContent();
@@ -70,16 +66,35 @@ router.get('/all-editable', auth, async (req, res) => {
             general: text.general,
             home: text.home,
             about: text.about,
-            services: services,
-            team: team
+            fixedRoles: text.fixedRoles || [], // ✅ Send roles to admin
+            services,
+            team
         });
     } catch (err) {
-        console.error("Admin Content Route Failed (Database/Mongoose Error):", err.message);
-        res.status(500).send('Server Error: Failed to load editable content.');
+        console.error("Admin Content Route Failed:", err.message);
+        res.status(500).send('Server Error');
     }
 });
 
-// POST api/content/all-editable (Text Content Save)
+// ✅ THIS IS THE MISSING ROUTE - ADD THIS!
+router.put('/fixed-roles', auth, async (req, res) => {
+    try {
+        const { fixedRoles } = req.body;
+
+        const updated = await TextContent.findOneAndUpdate(
+            { singletonKey: "site_content" },
+            { $set: { fixedRoles: fixedRoles } }, // Save the array
+            { new: true, upsert: true }
+        );
+
+        res.json({ fixedRoles: updated.fixedRoles });
+    } catch (err) {
+        console.error("Failed to save fixed roles:", err.message);
+        res.status(500).send('Server Error saving roles');
+    }
+});
+
+// POST api/content/all-editable (General Text Save)
 router.post('/all-editable', auth, async (req, res) => {
     const { general, home, about } = req.body; 
     try {
@@ -119,58 +134,39 @@ router.delete('/services/:id', auth, async (req, res) => {
 // --- CRUD for Team ---
 router.post('/team', auth, async (req, res) => {
     try {
+        // We do NOT save fixedRoles here, only the member details
         const newMember = new TeamMember(req.body);
         await newMember.save();
         res.json(newMember);
     } catch (err) { console.error(err.message); res.status(500).send('Server Error'); }
 });
 
-// ** TEAM MEMBER UPDATE ROUTE - FINAL ROBUST VERSION **
 router.put('/team/:id', auth, async (req, res) => {
-    const { 
-        name, role, bio, img, social, 
-        imgScale, imgOffsetX, imgOffsetY 
-    } = req.body;
+    const { name, role, bio, img, social, imgScale, imgOffsetX, imgOffsetY, group, subgroup } = req.body;
 
-    // Create the update object with explicit type guards and fallbacks.
-    // We use the || operator defensively here to ensure Mongoose never sees 
-    // an undefined or null value that hasn't been cast.
     const memberFields = {
-        name, 
-        role, 
-        bio, 
-        img, 
-        social: social, 
-        
-        // CRITICAL FIX: Ensure these fields are explicitly included and cast as Numbers.
-        // If the value is missing in req.body (e.g., undefined), it falls back to 
-        // the default and is successfully cast to a Number before the update.
+        name, role, bio, img, social,
         imgScale: parseFloat(imgScale) || 1.0, 
         imgOffsetX: parseInt(imgOffsetX, 10) || 0,
         imgOffsetY: parseInt(imgOffsetY, 10) || 0,
+        // ✅ Ensure group/subgroup are saved to the TeamMember model
+        group: parseInt(group) || 999,
+        subgroup: parseInt(subgroup) || 0
     };
     
-    // Clean up fields that are truly undefined (shouldn't be needed with the above || guards, but safer)
     Object.keys(memberFields).forEach(key => memberFields[key] === undefined && delete memberFields[key]);
 
     try {
         const member = await TeamMember.findByIdAndUpdate(
             req.params.id, 
-            { $set: memberFields }, // Use $set for surgical updates
-            { new: true, runValidators: true } // Return the new document and run Mongoose validation
+            { $set: memberFields }, 
+            { new: true, runValidators: true } 
         );
-
-        if (!member) {
-            return res.status(404).json({ msg: 'Team member not found' });
-        }
-        
-        // Return 200 OK with the updated document
+        if (!member) return res.status(404).json({ msg: 'Team member not found' });
         res.status(200).json(member); 
-        
     } catch (err) { 
         console.error("Team Member PUT Error:", err.message); 
-        // Send a detailed error message back to the client
-        res.status(500).json({ msg: `Server Error: Failed to update member. ${err.message}` }); 
+        res.status(500).json({ msg: `Server Error: ${err.message}` }); 
     }
 });
 
