@@ -1,3 +1,4 @@
+// models/TeamMember.js
 import mongoose from 'mongoose';
 
 /* ---------- Subdocument: Social link ---------- */
@@ -25,11 +26,14 @@ const TeamMemberSchema = new mongoose.Schema(
         // Hierarchy Sorting
         group: { type: Number, default: 999 },
         subgroup: { type: Number, default: 0 },
+        
+        // ✅ ADDED: This field allows you to name the subgroup (e.g. "Core Developers")
+        subgroupLabel: { type: String, default: '', trim: true },
 
         social: { type: [SocialSchema], default: [] },
     },
     { timestamps: true }
 );
 
-// ✅ FIX: Check if 'TeamMember' exists first, and use the correct name 'TeamMember'
+// Check if model exists before compiling to avoid hot-reload errors
 export default mongoose.models.TeamMember || mongoose.model('TeamMember', TeamMemberSchema);

@@ -23,7 +23,7 @@ const getSingletonContent = async () => {
                 whyChooseUs: [] 
             },
             about: { heroTitle: "Our Story", heroDescription: "...", mission: "...", vision: "...", journey: "..." },
-            fixedRoles: [] // ✅ Ensure this exists on creation
+            fixedRoles: [] 
         });
         await content.save();
     }
@@ -43,7 +43,7 @@ router.get('/all', async (req, res) => {
             general: text.general,
             home: text.home,
             about: text.about,
-            fixedRoles: text.fixedRoles || [], // ✅ Send roles to frontend
+            fixedRoles: text.fixedRoles || [],
             services,
             team,
             posts,
@@ -66,7 +66,7 @@ router.get('/all-editable', auth, async (req, res) => {
             general: text.general,
             home: text.home,
             about: text.about,
-            fixedRoles: text.fixedRoles || [], // ✅ Send roles to admin
+            fixedRoles: text.fixedRoles || [],
             services,
             team
         });
@@ -76,14 +76,14 @@ router.get('/all-editable', auth, async (req, res) => {
     }
 });
 
-// ✅ THIS IS THE MISSING ROUTE - ADD THIS!
+// --- FIXED ROLES ROUTE ---
 router.put('/fixed-roles', auth, async (req, res) => {
     try {
         const { fixedRoles } = req.body;
 
         const updated = await TextContent.findOneAndUpdate(
             { singletonKey: "site_content" },
-            { $set: { fixedRoles: fixedRoles } }, // Save the array
+            { $set: { fixedRoles: fixedRoles } }, 
             { new: true, upsert: true }
         );
 
@@ -134,7 +134,7 @@ router.delete('/services/:id', auth, async (req, res) => {
 // --- CRUD for Team ---
 router.post('/team', auth, async (req, res) => {
     try {
-        // We do NOT save fixedRoles here, only the member details
+        // Since we updated the Schema, passing req.body directly will now include subgroupLabel
         const newMember = new TeamMember(req.body);
         await newMember.save();
         res.json(newMember);
@@ -142,18 +142,21 @@ router.post('/team', auth, async (req, res) => {
 });
 
 router.put('/team/:id', auth, async (req, res) => {
-    const { name, role, bio, img, social, imgScale, imgOffsetX, imgOffsetY, group, subgroup } = req.body;
+    // ✅ ADDED subgroupLabel to extraction
+    const { name, role, bio, img, social, imgScale, imgOffsetX, imgOffsetY, group, subgroup, subgroupLabel } = req.body;
 
     const memberFields = {
         name, role, bio, img, social,
         imgScale: parseFloat(imgScale) || 1.0, 
         imgOffsetX: parseInt(imgOffsetX, 10) || 0,
         imgOffsetY: parseInt(imgOffsetY, 10) || 0,
-        // ✅ Ensure group/subgroup are saved to the TeamMember model
         group: parseInt(group) || 999,
-        subgroup: parseInt(subgroup) || 0
+        subgroup: parseInt(subgroup) || 0,
+        // ✅ ADDED: Pass this to the update
+        subgroupLabel: subgroupLabel || "" 
     };
     
+    // Clean undefined fields
     Object.keys(memberFields).forEach(key => memberFields[key] === undefined && delete memberFields[key]);
 
     try {
