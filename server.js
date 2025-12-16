@@ -1,6 +1,6 @@
-// server.js (VERCEL SERVERLESS SAFE)
+// server.js (VERCEL SERVERLESS SAFE – NODE 22 COMPATIBLE)
 
-import 'dotenv/config';
+import "dotenv/config";
 import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
@@ -29,7 +29,7 @@ const requiredEnvs = [
   "MONGO_URI",
   "CLOUDINARY_CLOUD_NAME",
   "CLOUDINARY_API_KEY",
-  "CLOUDINARY_API_SECRET"
+  "CLOUDINARY_API_SECRET",
 ];
 
 const missing = requiredEnvs.filter(k => !process.env[k]);
@@ -38,22 +38,19 @@ if (missing.length) {
 }
 
 // =======================
-// EXPRESS APP
+// APP INIT
 // =======================
 const app = express();
 app.set("trust proxy", 1);
 app.disable("x-powered-by");
 
-console.log("🚀 Vercel Serverless API Booted");
+console.log("🚀 Nexora API (Vercel Serverless) booted");
 
 // =======================
 // MONGODB (SERVERLESS SAFE)
 // =======================
 const MONGO_URI = process.env.MONGO_URI;
-
-if (!MONGO_URI) {
-  throw new Error("❌ MONGO_URI is not defined");
-}
+if (!MONGO_URI) throw new Error("❌ MONGO_URI is not defined");
 
 let cached = global.mongoose;
 if (!cached) {
@@ -74,13 +71,13 @@ async function connectDB() {
   return cached.conn;
 }
 
-// Connect DB on every request (cached)
+// Connect DB per request (cached)
 app.use(async (_req, _res, next) => {
   try {
     await connectDB();
     next();
   } catch (err) {
-    console.error("❌ MongoDB connection error:", err);
+    console.error("❌ MongoDB error:", err);
     next(err);
   }
 });
@@ -92,46 +89,41 @@ app.use(helmet());
 app.use(morgan("combined"));
 
 // =======================
-// CORS
+// ✅ CORS (FIXED, EXPLICIT, NODE 22 SAFE)
 // =======================
-const allowedOrigins = [
-  "http://localhost:3000",
-  "http://localhost:3001",
+const ALLOWED_ORIGINS = [
   "https://nexoracrew.com",
   "https://www.nexoracrew.com",
   "https://nexora-frontend-kappa.vercel.app",
-  process.env.FRONTEND_ORIGIN,
-  process.env.ADMIN_ORIGIN
-].filter(Boolean);
+  "http://localhost:3000",
+  "http://localhost:3001",
+];
 
-const corsOptions = {
-  origin: (origin, callback) => {
-    if (!origin) return callback(null, true);
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true); // server-to-server
 
-    try {
-      const incomingHost = new URL(origin).host;
+      if (ALLOWED_ORIGINS.includes(origin)) {
+        return callback(null, true);
+      }
 
-      const allowed =
-        allowedOrigins.some(o => {
-          try {
-            return new URL(o).host === incomingHost;
-          } catch {
-            return incomingHost.endsWith(o);
-          }
-        }) ||
-        incomingHost.endsWith(".vercel.app");
+      console.warn("🚫 CORS blocked:", origin);
+      return callback(new Error("CORS blocked"), false);
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
 
-      if (allowed) return callback(null, true);
-
-      return callback(new Error("Not allowed by CORS"), false);
-    } catch {
-      return callback(null, true);
-    }
-  },
-  credentials: true
-};
-
-app.use(cors(corsOptions));
+// ✅ SAFE preflight handler (NO "*", Node 22 compatible)
+app.use((req, res, next) => {
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(204);
+  }
+  next();
+});
 
 // =======================
 // BODY PARSING
@@ -158,14 +150,14 @@ app.use("/api/certificates", certificateRoutes);
 // ROOT & HEALTH
 // =======================
 app.get("/", (_req, res) => {
-  res.json({ message: "🚀 Nexora API is running (Vercel)" });
+  res.json({ message: "🚀 Nexora API is alive" });
 });
 
 app.get("/health", (_req, res) => {
   res.json({
     ok: true,
     uptime: process.uptime(),
-    time: new Date().toISOString(),
+    timestamp: new Date().toISOString(),
   });
 });
 
@@ -180,9 +172,9 @@ app.use((_req, res) => {
 // ERROR HANDLER
 // =======================
 app.use((err, _req, res, _next) => {
-  console.error("❌ API Error:", err);
+  console.error("❌ API Error:", err?.message || err);
   res.status(500).json({
-    message: err?.message || "Internal server error"
+    message: err?.message || "Internal server error",
   });
 });
 
