@@ -24,15 +24,15 @@ import certificateRoutes from "./routes/certificateRoutes.js";
 const app = express();
 const PORT = Number(process.env.PORT) || 5000;
 
-// Trust proxy is required for Vercel/Heroku to identify the original IP
+// Trust proxy is required for Vercel to identify the original IP
 app.set("trust proxy", 1);
 app.disable("x-powered-by"); 
 
-console.log("Starting server from:", process.cwd());
+console.log("Starting server...");
 console.log("NODE_ENV:", process.env.NODE_ENV || "development");
 
 // =======================
-//  CORS CONFIGURATION (FIXED)
+//  CORS CONFIGURATION (Fixed for Node 22)
 // =======================
 const allowedOrigins = [
   "http://localhost:3000",
@@ -40,25 +40,23 @@ const allowedOrigins = [
   "https://nexoracrew.com",
   "https://www.nexoracrew.com",
   "https://nexora-frontend-kappa.vercel.app",
-  // Safely include env vars only if they exist
   process.env.ADMIN_ORIGIN,
   process.env.FRONTEND_ORIGIN
-].filter(Boolean); // Removes undefined/null values
+].filter(Boolean); // Clean up empty values
 
 console.log("✅ Allowed CORS origins:", allowedOrigins);
 
 const corsOptions = {
   origin: (origin, callback) => {
-    // 1. Allow requests with no origin (like mobile apps, Postman, or server-to-server)
+    // 1. Allow no-origin (mobile apps, server-to-server, curl)
     if (!origin) return callback(null, true);
 
-    // 2. Check exact match
+    // 2. Exact match
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
 
-    // 3. Check dynamic subdomains (Vercel, Koyeb, Netlify)
-    // Using strict string ending prevents "malicious-nexora.com" from passing
+    // 3. Dynamic subdomains (Vercel, Koyeb, Netlify)
     const isAllowedProvider = 
       origin.endsWith(".vercel.app") || 
       origin.endsWith(".koyeb.app") || 
@@ -68,7 +66,7 @@ const corsOptions = {
       return callback(null, true);
     }
 
-    // 4. Block everything else
+    // 4. Block
     console.warn(`🚫 BLOCKED BY CORS: ${origin}`);
     return callback(new Error("Not allowed by CORS"));
   },
@@ -77,10 +75,9 @@ const corsOptions = {
   allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
 };
 
-// Apply CORS middleware
 app.use(cors(corsOptions));
-// Explicitly handle preflight (OPTIONS) requests for all routes
-app.options(/.*/, cors(corsOptions));
+// FIX: Use Regex /.*/ to match all routes safely in Node 22+
+app.options(/.*/, cors(corsOptions)); 
 
 // =======================
 //  SECURITY & LOGGING
@@ -95,35 +92,60 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 // =======================
-//  DATABASE CONNECTION
+//  OPTIMIZED DATABASE CONNECTION
 // =======================
-(async () => {
+let isConnected = false; // Track connection status
+
+const connectDB = async () => {
+  if (isConnected) {
+    return; // Already connected
+  }
+
   try {
-    // CRITICAL: Ensure MONGO_URI is set in Vercel Settings
     const uri = process.env.MONGO_URI;
 
+    // CRITICAL CHECK for Vercel
     if (!uri) {
-        console.error("❌ CRITICAL ERROR: MONGO_URI is missing in environment variables.");
-        // We do not fallback to localhost in production because Vercel has no local DB.
-        if (process.env.NODE_ENV === 'production') {
-            throw new Error("MONGO_URI is required in production");
-        }
+      const errorMsg = "❌ FATAL: MONGO_URI is missing in environment variables.";
+      console.error(errorMsg);
+      // In production, we cannot fall back to localhost (it doesn't exist on Vercel)
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error(errorMsg); 
+      }
     }
 
     const connectionString = uri || "mongodb://127.0.0.1:27017/nexora";
+
+    console.log("⏳ Connecting to MongoDB...");
     
-    await mongoose.connect(connectionString, { autoIndex: true });
+    // Connect with a 5-second timeout (fails fast instead of hanging for 30s)
+    await mongoose.connect(connectionString, {
+      serverSelectionTimeoutMS: 5000, 
+      autoIndex: true,
+    });
+
+    isConnected = true;
     console.log("✅ MongoDB Connected Successfully");
   } catch (err) {
-    console.error("❌ MongoDB Connection Failed:", err?.message || err);
-    // Do not process.exit(1) on Vercel, it restarts the server endlessly. 
-    // Just log it so you can see it in Vercel logs.
+    console.error("❌ MongoDB Connection Failed:", err.message);
+    // We do not exit process here, allowing the 500 error to be sent to client
   }
-})();
+};
+
+// Connect immediately
+connectDB();
 
 // =======================
 //  API ROUTES
 // =======================
+// Middleware to ensure DB is connected before handling requests
+app.use(async (req, res, next) => {
+  if (!isConnected) {
+    await connectDB(); // Try one last time
+  }
+  next();
+});
+
 app.use("/api/auth", authRoutes);
 app.use("/api/content", contentRoutes);
 app.use("/api/messages", messageRoutes);
@@ -149,36 +171,30 @@ app.get("/", (_req, res) => {
 app.get("/health", (_req, res) => {
   res.status(200).json({
     ok: true,
+    db: isConnected ? "connected" : "disconnected",
     uptime: process.uptime(),
-    timestamp: new Date().toISOString(),
   });
 });
 
 // =======================
 //  ERROR HANDLING
 // =======================
-
-// 404 Handler
 app.use((req, res) => {
   res.status(404).json({
     message: `404 Not Found: ${req.method} ${req.originalUrl}`,
   });
 });
 
-// Global Error Handler
 app.use((err, _req, res, _next) => {
-  console.error("⚠️ Global Error:", err?.message || err);
+  console.error("⚠️ Global Error Handler:", err.message);
 
-  // Handle CORS errors specifically
   if (err.message === "Not allowed by CORS") {
-    return res.status(403).json({ 
-        message: "CORS Blocked: Origin not allowed",
-        error: "CORS_ERROR"
-    });
+    return res.status(403).json({ message: "CORS Blocked" });
   }
 
   res.status(500).json({ 
-      message: err?.message || "Internal server error" 
+      message: "Internal Server Error",
+      error: process.env.NODE_ENV === "development" ? err.message : undefined 
   });
 });
 
@@ -193,8 +209,10 @@ const server = app.listen(PORT, () => {
 const graceful = async (signal) => {
   console.log(`\n${signal} received. Closing server...`);
   server.close(() => console.log("HTTP server closed."));
-  await mongoose.disconnect();
-  console.log("MongoDB disconnected.");
+  if (isConnected) {
+      await mongoose.disconnect();
+      console.log("MongoDB disconnected.");
+  }
   process.exit(0);
 };
 
