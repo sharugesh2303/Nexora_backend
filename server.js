@@ -24,7 +24,7 @@ import certificateRoutes from "./routes/certificateRoutes.js";
 const app = express();
 const PORT = Number(process.env.PORT) || 5000;
 
-// Trust proxy is required for Vercel to identify the original IP
+// Trust proxy is required for Vercel/Heroku
 app.set("trust proxy", 1);
 app.disable("x-powered-by"); 
 
@@ -32,7 +32,7 @@ console.log("Starting server...");
 console.log("NODE_ENV:", process.env.NODE_ENV || "development");
 
 // =======================
-//  CORS CONFIGURATION (Fixed for Node 22)
+//  CORS CONFIGURATION
 // =======================
 const allowedOrigins = [
   "http://localhost:3000",
@@ -42,31 +42,22 @@ const allowedOrigins = [
   "https://nexora-frontend-kappa.vercel.app",
   process.env.ADMIN_ORIGIN,
   process.env.FRONTEND_ORIGIN
-].filter(Boolean); // Clean up empty values
+].filter(Boolean);
 
 console.log("✅ Allowed CORS origins:", allowedOrigins);
 
 const corsOptions = {
   origin: (origin, callback) => {
-    // 1. Allow no-origin (mobile apps, server-to-server, curl)
     if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
 
-    // 2. Exact match
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-
-    // 3. Dynamic subdomains (Vercel, Koyeb, Netlify)
     const isAllowedProvider = 
       origin.endsWith(".vercel.app") || 
       origin.endsWith(".koyeb.app") || 
       origin.endsWith(".netlify.app");
 
-    if (isAllowedProvider) {
-      return callback(null, true);
-    }
+    if (isAllowedProvider) return callback(null, true);
 
-    // 4. Block
     console.warn(`🚫 BLOCKED BY CORS: ${origin}`);
     return callback(new Error("Not allowed by CORS"));
   },
@@ -76,8 +67,20 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-// FIX: Use Regex /.*/ to match all routes safely in Node 22+
-app.options(/.*/, cors(corsOptions)); 
+app.options(/.*/, cors(corsOptions)); // Fix for Node 22
+
+// =======================
+//  🚀 INSTANT SPEED CACHING
+// =======================
+// This middleware makes your site load instantly by caching responses
+app.use((req, res, next) => {
+  // Only cache data fetching (GET), never cache login/updates (POST/PUT)
+  if (req.method === 'GET') {
+    // browser cache: 5 min, cdn cache: 1 hour, background update: yes
+    res.set('Cache-Control', 'public, max-age=300, s-maxage=3600, stale-while-revalidate');
+  }
+  next();
+});
 
 // =======================
 //  SECURITY & LOGGING
@@ -94,31 +97,25 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 // =======================
 //  OPTIMIZED DATABASE CONNECTION
 // =======================
-let isConnected = false; // Track connection status
+let isConnected = false; 
 
 const connectDB = async () => {
-  if (isConnected) {
-    return; // Already connected
-  }
+  if (isConnected) return; 
 
   try {
     const uri = process.env.MONGO_URI;
 
-    // CRITICAL CHECK for Vercel
     if (!uri) {
       const errorMsg = "❌ FATAL: MONGO_URI is missing in environment variables.";
       console.error(errorMsg);
-      // In production, we cannot fall back to localhost (it doesn't exist on Vercel)
-      if (process.env.NODE_ENV === 'production') {
-        throw new Error(errorMsg); 
-      }
+      if (process.env.NODE_ENV === 'production') throw new Error(errorMsg); 
     }
 
     const connectionString = uri || "mongodb://127.0.0.1:27017/nexora";
 
     console.log("⏳ Connecting to MongoDB...");
     
-    // Connect with a 5-second timeout (fails fast instead of hanging for 30s)
+    // 5-second timeout to fail fast if connection is blocked
     await mongoose.connect(connectionString, {
       serverSelectionTimeoutMS: 5000, 
       autoIndex: true,
@@ -128,7 +125,6 @@ const connectDB = async () => {
     console.log("✅ MongoDB Connected Successfully");
   } catch (err) {
     console.error("❌ MongoDB Connection Failed:", err.message);
-    // We do not exit process here, allowing the 500 error to be sent to client
   }
 };
 
@@ -138,10 +134,10 @@ connectDB();
 // =======================
 //  API ROUTES
 // =======================
-// Middleware to ensure DB is connected before handling requests
+// Ensure DB is connected before handling requests
 app.use(async (req, res, next) => {
   if (!isConnected) {
-    await connectDB(); // Try one last time
+    await connectDB();
   }
   next();
 });
@@ -186,7 +182,7 @@ app.use((req, res) => {
 });
 
 app.use((err, _req, res, _next) => {
-  console.error("⚠️ Global Error Handler:", err.message);
+  console.error("⚠️ Error:", err.message);
 
   if (err.message === "Not allowed by CORS") {
     return res.status(403).json({ message: "CORS Blocked" });
@@ -205,7 +201,6 @@ const server = app.listen(PORT, () => {
   console.log(`🌐 Server running on port ${PORT}`);
 });
 
-// Graceful Shutdown
 const graceful = async (signal) => {
   console.log(`\n${signal} received. Closing server...`);
   server.close(() => console.log("HTTP server closed."));
