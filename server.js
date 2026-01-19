@@ -84,6 +84,7 @@ const allowedOrigins = [
   "https://nexoracrew.com",
   "https://www.nexoracrew.com",
   "https://nexora-frontend-kappa.vercel.app",
+  "https://finance.nexoracrew.com",
   process.env.ADMIN_ORIGIN,
   process.env.FRONTEND_ORIGIN
 ].filter(Boolean);
