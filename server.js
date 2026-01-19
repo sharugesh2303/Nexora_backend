@@ -54,7 +54,7 @@ app.disable("x-powered-by"); // don't reveal server stack
 // =======================
 (async () => {
   try {
-    const uri = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/nexora" || "https://finance.nexoracrew.com";
+    const uri = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/nexora" ;
 
     if (!process.env.MONGO_URI) {
       console.warn(`⚠️ MONGO_URI not found in .env. Using fallback local URI: ${uri}`);
@@ -84,7 +84,7 @@ const allowedOrigins = [
   "https://nexoracrew.com",
   "https://www.nexoracrew.com",
   "https://nexora-frontend-kappa.vercel.app",
-  "https://finance.nexoracrew.com",
+  
   process.env.ADMIN_ORIGIN,
   process.env.FRONTEND_ORIGIN
 ].filter(Boolean);
